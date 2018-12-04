@@ -134,7 +134,7 @@ void BackupManager::keyRemoved()
 void BackupManager::bitmap(QString description)
 {
     if (!mBitmap) { return; }
-    AddBitmapElement* element = new AddBitmapElement(mBitmap,
+    BitmapCommand* element = new BitmapCommand(mBitmap,
                                                      mBufferImage->clone(),
                                                      mLayerId,
                                                      mFrameIndex,

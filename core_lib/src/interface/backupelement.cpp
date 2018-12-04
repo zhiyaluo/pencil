@@ -54,6 +54,13 @@ AddKeyFrameElement::AddKeyFrameElement(int backupFrameIndex,
                                        Editor *editor,
                                        QUndoCommand *parent) : BackupElement(editor, parent)
 {
+    qDebug() << description;
+    qDebug()
+        << "backupFrameIndex=" << backupFrameIndex << "\n"
+        << "backupLayerId=" << backupLayerId << "\n"
+        << "backupKeySpacing" << backupKeySpacing << "\n"
+        << "backupKeyExisted" << backupKeyExisted << "\n";
+
     newLayerIndex = editor->currentLayerIndex();
     newFrameIndex = editor->currentFrame();
 
@@ -277,71 +284,52 @@ bool RemoveKeyFrameElement::mergeWith(const QUndoCommand *other)
 }
 
 
-AddBitmapElement::AddBitmapElement(BitmapImage* backupBitmap,
-                                   BitmapImage* backupBufferBitmap,
-                                   int backupLayerId,
-                                   int backupFrameIndex,
-                                   QString description,
-                                   Editor* editor,
-                                   QUndoCommand* parent) : BackupElement(editor, parent)
+BitmapCommand::BitmapCommand(BitmapImage* backupBitmap,
+                             BitmapImage* backupBufferBitmap,
+                             int backupLayerId,
+                             int backupFrameIndex,
+                             QString description,
+                             Editor* editor,
+                             QUndoCommand* parent) : BackupElement(editor, parent)
 {
-    oldBitmap = backupBitmap->clone();
-    oldBufferImage = backupBufferBitmap->clone();
+    qDebug() << "\n-----------";
+    qDebug() << description;
+    qDebug()
+        << " backupFrameIndex=" << backupFrameIndex << "\n"
+        << "backupLayerId=" << backupLayerId << "\n";
 
-    frameIndex = backupFrameIndex;
-    newLayerIndex = editor->currentLayerIndex();
-    oldLayerId = backupLayerId;
+    mOldBitmap = backupBitmap->clone();
+    mOldBufferImage = backupBufferBitmap->clone();
+
+    mFrameIndex = backupFrameIndex;
+    mNewLayerIndex = editor->currentLayerIndex();
+    mOldLayerId = backupLayerId;
 
     Layer* layer = editor->layers()->currentLayer();
-    newLayerId = layer->id();
+    mNewLayerId = layer->id();
 
-    emptyFrameSettingVal = editor->preference()->
+    mEmptyFrameSettingVal = editor->preference()->
             getInt(SETTING::DRAW_ON_EMPTY_FRAME_ACTION);
 
-    otherFrameIndex = frameIndex;
-    if (emptyFrameSettingVal == DrawOnEmptyFrameAction::KEEP_DRAWING_ON_PREVIOUS_KEY)
+    mOtherFrameIndex = mFrameIndex;
+    if (mEmptyFrameSettingVal == DrawOnEmptyFrameAction::KEEP_DRAWING_ON_PREVIOUS_KEY)
     {
-        previousFrameIndex = layer->getPreviousKeyFramePosition(frameIndex);
-        otherFrameIndex = previousFrameIndex;
+        mPreviousFrameIndex = layer->getPreviousKeyFramePosition(mFrameIndex);
+        mOtherFrameIndex = mPreviousFrameIndex;
     }
-    newBitmap = static_cast<BitmapImage*>(layer->getKeyFrameAt(otherFrameIndex)->clone());
+    mNewBitmap = static_cast<BitmapImage*>(layer->getKeyFrameAt(mOtherFrameIndex)->clone());
 
+    qDebug()
+        << "  frameIndex=" << mFrameIndex
+        << "  previousFrameIndex=" << mPreviousFrameIndex
+        << "  otherFrameIndex=" << mOtherFrameIndex;
+    qDebug() << "-------";
     setText(description);
 }
 
-void AddBitmapElement::undoTransform()
+void BitmapCommand::undo()
 {
-    const TransformElement* childElem = static_cast<const TransformElement*>(this->child(0));
-    ScribbleArea* scribbleArea = editor()->getScribbleArea();
-
-    // clone old bitmap so we don't paint on the same...
-    BitmapImage* oldBitmapClone = oldBitmap->clone();
-
-    // get the previous image from our old image
-    BitmapImage transformedImage = childElem->oldBitmap->transformed(childElem->oldSelectionRect.toRect(),
-                                                                     childElem->oldTransform,
-                                                                     false);
-    // clear leftovers...
-    oldBitmapClone->clear(childElem->oldSelectionRect);
-
-    // paste tranformedImage to our cloned bitmap
-    oldBitmapClone->paste(&transformedImage, QPainter::CompositionMode_SourceOver);
-
-    // make the cloned bitmap the new canvas image.
-    *static_cast<LayerBitmap*>(layer)->
-            getBitmapImageAtFrame(frameIndex) = *oldBitmapClone;
-
-    // set selections so the transform will be correct
-    scribbleArea->mySelection = childElem->oldSelectionRectTemp;
-    scribbleArea->myTempTransformedSelection = childElem->oldSelectionRectTemp;
-    scribbleArea->myTransformedSelection= childElem->oldSelectionRectTemp;
-
-    scribbleArea->paintTransformedSelection();
-}
-
-void AddBitmapElement::undo()
-{
-    layer = editor()->layers()->findLayerById(oldLayerId);
+    mLayer = editor()->layers()->findLayerById(mOldLayerId);
 
     if (editor()->getScribbleArea()->isSomethingSelected())
     {
@@ -350,21 +338,20 @@ void AddBitmapElement::undo()
     else
     {
         // apply the bitmap change
-        BitmapImage* img = static_cast<LayerBitmap*>(layer)->getBitmapImageAtFrame(frameIndex);
-        *img = *oldBitmap;
+        BitmapImage* img = static_cast<LayerBitmap*>(mLayer)->getBitmapImageAtFrame(mFrameIndex);
+        *img = *mOldBitmap;
     }
 
-    if (previousFrameIndex == frameIndex)
+    if (mPreviousFrameIndex == mFrameIndex)
     {
-        frameIndex = previousFrameIndex;
+        mFrameIndex = mPreviousFrameIndex;
     }
-
-    editor()->scrubTo(frameIndex);
+    editor()->scrubTo(mFrameIndex);
 }
 
-void AddBitmapElement::redo()
+void BitmapCommand::redo()
 {
-    Layer* layer = editor()->layers()->findLayerById(newLayerId);
+    Layer* layer = editor()->layers()->findLayerById(mNewLayerId);
 
     if (editor()->getScribbleArea()->isSomethingSelected())
     {
@@ -378,31 +365,61 @@ void AddBitmapElement::redo()
             return;
         }
 
-        *static_cast<LayerBitmap*>(layer)->
-                getBitmapImageAtFrame(otherFrameIndex) = *newBitmap;
+        BitmapImage* img = static_cast<BitmapImage*>(layer->getKeyFrameAt(mOtherFrameIndex));
+        *img = *mNewBitmap;
     }
 
-    if (previousFrameIndex == frameIndex)
+    if (mPreviousFrameIndex == mFrameIndex)
     {
-        frameIndex = previousFrameIndex;
+        mFrameIndex = mPreviousFrameIndex;
     }
 
-    editor()->scrubTo(frameIndex);
+    editor()->scrubTo(mFrameIndex);
 }
 
-void AddBitmapElement::redoTransform()
+void BitmapCommand::undoTransform()
 {
     const TransformElement* childElem = static_cast<const TransformElement*>(this->child(0));
     ScribbleArea* scribbleArea = editor()->getScribbleArea();
-    Layer* layer = editor()->layers()->findLayerById(newLayerId);
 
-    newBitmap->clear(childElem->newSelectionRect);
+    // clone old bitmap so we don't paint on the same...
+    BitmapImage* oldBitmapClone = mOldBitmap->clone();
 
-    BitmapImage* newBitmapClone = newBitmap->clone();
-    if (isFirstRedo) {
+    // get the previous image from our old image
+    BitmapImage transformedImage = childElem->oldBitmap->transformed(childElem->oldSelectionRect.toRect(),
+                                                                     childElem->oldTransform,
+                                                                     false);
+    // clear leftovers...
+    oldBitmapClone->clear(childElem->oldSelectionRect);
 
+    // paste tranformedImage to our cloned bitmap
+    oldBitmapClone->paste(&transformedImage, QPainter::CompositionMode_SourceOver);
+
+    // make the cloned bitmap the new canvas image.
+    *static_cast<LayerBitmap*>(mLayer)->
+        getBitmapImageAtFrame(mFrameIndex) = *oldBitmapClone;
+
+    // set selections so the transform will be correct
+    scribbleArea->mySelection = childElem->oldSelectionRectTemp;
+    scribbleArea->myTempTransformedSelection = childElem->oldSelectionRectTemp;
+    scribbleArea->myTransformedSelection = childElem->oldSelectionRectTemp;
+
+    scribbleArea->paintTransformedSelection();
+}
+
+void BitmapCommand::redoTransform()
+{
+    const TransformElement* childElem = static_cast<const TransformElement*>(this->child(0));
+    ScribbleArea* scribbleArea = editor()->getScribbleArea();
+    Layer* layer = editor()->layers()->findLayerById(mNewLayerId);
+
+    mNewBitmap->clear(childElem->newSelectionRect);
+
+    BitmapImage* newBitmapClone = mNewBitmap->clone();
+    if (isFirstRedo)
+    {
         // copy buffer image
-        BitmapImage newTransformed = oldBufferImage->transformed(childElem->newSelectionRect.toRect(), QTransform(), false);
+        BitmapImage newTransformed = mOldBufferImage->transformed(childElem->newSelectionRect.toRect(), QTransform(), false);
 
         // get transformed image from old position
         BitmapImage transformedImage = childElem->oldBitmap->transformed(childElem->newSelectionRect.toRect(), childElem->newTransform, false);
@@ -416,7 +433,7 @@ void AddBitmapElement::redoTransform()
 
     // set new bitmap to canvas (not painted yet)
     *static_cast<LayerBitmap*>(layer)->
-            getBitmapImageAtFrame(otherFrameIndex) = *newBitmapClone;
+            getBitmapImageAtFrame(mOtherFrameIndex) = *newBitmapClone;
 
     // reset transform and set selections
     scribbleArea->setSelectionTransform(QTransform());
@@ -430,7 +447,6 @@ void AddBitmapElement::redoTransform()
 
 AddVectorElement::AddVectorElement(VectorImage* backupVector, int backupLayerId, QString description, Editor* editor, QUndoCommand* parent) : BackupElement(editor, parent)
 {
-
     oldVector = backupVector;
     newLayerIndex = editor->layers()->currentLayerIndex();
     frameIndex = editor->currentFrame();
@@ -591,7 +607,6 @@ void SelectionElement::redo()
     } else {
         redoDeselection();
     }
-
 }
 
 void SelectionElement::redoSelection()
@@ -637,7 +652,8 @@ bool SelectionElement::mergeWith(const QUndoCommand *other)
     }
 
     SelectionType otherType = static_cast<const SelectionElement*>(other)->selectionType;
-    if (selectionType == SelectionType::SELECTION && otherType == selectionType) {
+    if (selectionType == SelectionType::SELECTION && otherType == selectionType)
+    {
         newTempSelection = static_cast<const SelectionElement*>(other)->newTempSelection;
         newSelection = static_cast<const SelectionElement*>(other)->newSelection;
 
@@ -647,20 +663,19 @@ bool SelectionElement::mergeWith(const QUndoCommand *other)
         scribbleArea->myTransformedSelection = newTempSelection;
 
         return true;
-    } else {
-        return false;
     }
+    return false;
 }
 
 TransformElement::TransformElement(KeyFrame* backupKeyFrame,
                                    BitmapImage* backupBufferImage,
-                               int backupLayerId,
-                               int backupFramePos,
-                               QRectF backupSelection,
-                               QRectF backupTempSelection,
-                               QTransform backupTransform,
-                               Editor *editor,
-                               QUndoCommand *parent) : BackupElement(editor, parent)
+                                   int backupLayerId,
+                                   int backupFramePos,
+                                   QRectF backupSelection,
+                                   QRectF backupTempSelection,
+                                   QTransform backupTransform,
+                                   Editor* editor,
+                                   QUndoCommand* parent) : BackupElement(editor, parent)
 {
 
 

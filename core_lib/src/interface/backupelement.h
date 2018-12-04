@@ -58,10 +58,10 @@ private:
     Editor* mEditor = nullptr;
 };
 
-class AddBitmapElement : public BackupElement
+class BitmapCommand : public BackupElement
 {
 public:
-    AddBitmapElement(BitmapImage* backupBitmap, BitmapImage* bufferImage,
+    BitmapCommand(BitmapImage* backupBitmap, BitmapImage* bufferImage,
                      int backupLayerId,
                      int backupFrameIndex,
                      QString description,
@@ -74,23 +74,23 @@ public:
     void redoTransform();
     void undoTransform();
 
-    int oldLayerIndex = 0;
-    int newLayerIndex = 0;
+    int mOldLayerIndex = 0;
+    int mNewLayerIndex = 0;
 
-    int frameIndex = 0;
-    int previousFrameIndex = 0;
-    int otherFrameIndex = 0;
+    int mFrameIndex = 0;
+    int mPreviousFrameIndex = 0;
+    int mOtherFrameIndex = 0;
 
-    int oldLayerId = 0;
-    int newLayerId = 0;
+    int mOldLayerId = 0;
+    int mNewLayerId = 0;
 
-    int emptyFrameSettingVal = -1;
+    int mEmptyFrameSettingVal = -1;
 
-    BitmapImage* oldBitmap = nullptr;
-    BitmapImage* newBitmap = nullptr;
+    BitmapImage* mOldBitmap = nullptr;
+    BitmapImage* mNewBitmap = nullptr;
 
-    BitmapImage* oldBufferImage = nullptr;
-    Layer* layer = nullptr;
+    BitmapImage* mOldBufferImage = nullptr;
+    Layer* mLayer = nullptr;
 
     bool isFirstRedo = true;
 };
