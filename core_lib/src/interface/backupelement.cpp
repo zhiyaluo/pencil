@@ -54,7 +54,6 @@ AddKeyFrameElement::AddKeyFrameElement(int backupFrameIndex,
                                        Editor *editor,
                                        QUndoCommand *parent) : BackupElement(editor, parent)
 {
-
     newLayerIndex = editor->currentLayerIndex();
     newFrameIndex = editor->currentFrame();
 
@@ -283,10 +282,9 @@ AddBitmapElement::AddBitmapElement(BitmapImage* backupBitmap,
                                    int backupLayerId,
                                    int backupFrameIndex,
                                    QString description,
-                                   Editor *editor,
-                                   QUndoCommand *parent) : BackupElement(editor, parent)
+                                   Editor* editor,
+                                   QUndoCommand* parent) : BackupElement(editor, parent)
 {
-
     oldBitmap = backupBitmap->clone();
     oldBufferImage = backupBufferBitmap->clone();
 
@@ -306,8 +304,7 @@ AddBitmapElement::AddBitmapElement(BitmapImage* backupBitmap,
         previousFrameIndex = layer->getPreviousKeyFramePosition(frameIndex);
         otherFrameIndex = previousFrameIndex;
     }
-    newBitmap = static_cast<LayerBitmap*>(layer)->
-            getBitmapImageAtFrame(otherFrameIndex)->clone();
+    newBitmap = static_cast<BitmapImage*>(layer->getKeyFrameAt(otherFrameIndex)->clone());
 
     setText(description);
 }
@@ -320,11 +317,10 @@ void AddBitmapElement::undoTransform()
     // clone old bitmap so we don't paint on the same...
     BitmapImage* oldBitmapClone = oldBitmap->clone();
 
-    // get the previous image from our old iamge
+    // get the previous image from our old image
     BitmapImage transformedImage = childElem->oldBitmap->transformed(childElem->oldSelectionRect.toRect(),
                                                                      childElem->oldTransform,
                                                                      false);
-
     // clear leftovers...
     oldBitmapClone->clear(childElem->oldSelectionRect);
 
@@ -334,7 +330,6 @@ void AddBitmapElement::undoTransform()
     // make the cloned bitmap the new canvas image.
     *static_cast<LayerBitmap*>(layer)->
             getBitmapImageAtFrame(frameIndex) = *oldBitmapClone;
-
 
     // set selections so the transform will be correct
     scribbleArea->mySelection = childElem->oldSelectionRectTemp;
@@ -354,7 +349,9 @@ void AddBitmapElement::undo()
     }
     else
     {
-        *static_cast<LayerBitmap*>(layer)->getBitmapImageAtFrame(frameIndex) = *oldBitmap;
+        // apply the bitmap change
+        BitmapImage* img = static_cast<LayerBitmap*>(layer)->getBitmapImageAtFrame(frameIndex);
+        *img = *oldBitmap;
     }
 
     if (previousFrameIndex == frameIndex)

@@ -38,10 +38,12 @@ class Camera;
 class Layer;
 class KeyFrame;
 
-enum types { UNDEFINED,
-             ADD_KEY_MODIF,
-             REMOVE_KEY_MODIF
-           };
+enum class UndoType
+{
+    UNDEFINED,
+    ADD_KEY_MODIF,
+    REMOVE_KEY_MODIF
+};
 
 class BackupElement : public QUndoCommand
 {
@@ -50,10 +52,8 @@ public:
     virtual ~BackupElement();
 
     Editor* editor() { return mEditor; }
+    virtual UndoType undoType() { return UndoType::UNDEFINED; }
 
-    virtual int type() { return UNDEFINED; }
-    virtual void undo() { Q_ASSUME(true); } // should never end here
-    virtual void redo() { Q_ASSUME(true); } // should never end here
 private:
     Editor* mEditor = nullptr;
 };
@@ -68,12 +68,17 @@ public:
                      Editor* editor,
                      QUndoCommand* parent = nullptr);
 
+    void undo() override;
+    void redo() override;
+
+    void redoTransform();
+    void undoTransform();
+
     int oldLayerIndex = 0;
     int newLayerIndex = 0;
 
     int frameIndex = 0;
     int previousFrameIndex = 0;
-
     int otherFrameIndex = 0;
 
     int oldLayerId = 0;
@@ -88,12 +93,6 @@ public:
     Layer* layer = nullptr;
 
     bool isFirstRedo = true;
-
-    void undo() override;
-    void redo() override;
-
-    void redoTransform();
-    void undoTransform();
 };
 
 class AddVectorElement : public BackupElement
@@ -153,7 +152,7 @@ public:
 
     bool isFirstRedo = true;
 
-    int type() override { return ADD_KEY_MODIF; }
+    UndoType undoType() override { return UndoType::ADD_KEY_MODIF; }
     void undo() override;
     void redo() override;
     int id() const override { return Id; }
@@ -187,7 +186,7 @@ public:
 
     bool isFirstRedo = true;
 
-    int type() override { return REMOVE_KEY_MODIF; }
+    UndoType undoType() override { return UndoType::REMOVE_KEY_MODIF; }
     void undo() override;
     void redo() override;
     bool mergeWith(const QUndoCommand *other) override;

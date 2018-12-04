@@ -329,7 +329,7 @@ void BackupManager::restoreKey(BackupElement* backupElement)
     int layerId = 0;
     KeyFrame* keyFrame = nullptr;
 
-    if (backupElement->type() == ADD_KEY_MODIF)
+    if (backupElement->undoType() == UndoType::ADD_KEY_MODIF)
     {
         AddKeyFrameElement* lastBackupKeyFrameElement = (AddKeyFrameElement*)backupElement;
         layerIndex = lastBackupKeyFrameElement->newLayerIndex;
